@@ -66,6 +66,17 @@ app.post('/scream', (req, res) => {
     });
 });
 
+const isEmpty = string => {
+  if (string.trim() === '') return true;
+  else return false;
+};
+
+const isEmail = email => {
+  const emailRegEx = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  if (email.match(emailRegEx)) return true;
+  else return false;
+};
+
 app.post('/signup', (req, res) => {
   const newUser = {
     email: req.body.email,
@@ -73,6 +84,24 @@ app.post('/signup', (req, res) => {
     confirmPassword: req.body.confirmPassword,
     handle: req.body.handle
   };
+  let errors = {};
+
+  if (isEmpty(newUser.email)) {
+    errors.email = 'must not be empty';
+  } else if (!isEmail(newUser.email)) {
+    errors.email = 'must be a valid email address';
+  }
+  if (isEmpty(newUser.password)) {
+    errors.password = 'must not be empty';
+  } else if (newUser.password.length < 6) {
+    errors.password = 'password minimal 6 characther';
+  } else if (newUser.password !== newUser.confirmPassword) {
+    errors.confirmPassword = 'password not match';
+  }
+  if (isEmpty(newUser.handle)) {
+    errors.handle = 'must not be empty';
+  }
+  if (Object.keys(errors).length > 0) return res.status(400).json(errors);
 
   let token, userIdSnap;
   db.doc(`/users/${newUser.handle}`)
@@ -105,6 +134,43 @@ app.post('/signup', (req, res) => {
     })
     .catch(err => {
       console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
+});
+
+app.post('/login', (req, res) => {
+  const user = {
+    email: req.body.email,
+    password: req.body.password
+  };
+
+  let errors = {};
+
+  if (isEmpty(user.email)) {
+    errors.email = 'must not be empty';
+  }
+  if (isEmpty(user.password)) {
+    errors.password = 'must not be empty';
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return res.status(400).json(errors);
+  }
+
+  firebase
+    .auth()
+    .signInWithEmailAndPassword(user.email, user.password)
+    .then(data => {
+      return data.user.getIdToken();
+    })
+    .then(token => {
+      return res.json({ token });
+    })
+    .catch(err => {
+      console.error(err);
+      if (err.code === 'auth/wrong-password') {
+        return res.status(403).json({ general: 'Wrong username or Password' });
+      }
       return res.status(500).json({ error: err.code });
     });
 });
