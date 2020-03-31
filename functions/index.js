@@ -1,179 +1,19 @@
 const functions = require('firebase-functions');
-const admin = require('firebase-admin');
 const express = require('express');
-const firebase = require('firebase');
+
+const auth = require('./util/auth');
+const { getAllScreams, addScream } = require('./handlers/scream');
+const { signup, signIn } = require('./handlers/user');
 
 const app = express();
-var serviceAccount = require('./socialapp-d5975-9bc2ed23b4ff.json');
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: 'https://socialapp-d5975.firebaseio.com'
-});
-const db = admin.firestore();
+app.get('/screams', getAllScreams);
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyBdvligNYUknXGYbee-uI9qNSjmHQynBqA',
-  authDomain: 'socialapp-d5975.firebaseapp.com',
-  databaseURL: 'https://socialapp-d5975.firebaseio.com',
-  projectId: 'socialapp-d5975',
-  storageBucket: 'socialapp-d5975.appspot.com',
-  messagingSenderId: '325340725354',
-  appId: '1:325340725354:web:9c1fb2a0e774b675190a13',
-  measurementId: 'G-NYXR367F3C'
-};
+app.post('/scream', auth, addScream);
 
-firebase.initializeApp(firebaseConfig);
+app.post('/signup', signup);
 
-app.get('/screams', (req, res) => {
-  db.collection('screams')
-    .orderBy('createdAt', 'desc')
-    .get()
-    .then(data => {
-      console.log(data);
-      let screams = [];
-      data.forEach(doc => {
-        console.log(doc);
-        screams.push({
-          screamId: doc.id,
-          body: doc.data().body,
-          userHandle: doc.data().userHandle,
-          createdAt: doc.data().createdAt,
-          commentCount: doc.data().commentCount,
-          likeCount: doc.data().likeCount
-        });
-      });
-      return res.json(screams);
-    })
-    .catch(err => console.error(err));
-});
-
-app.post('/scream', (req, res) => {
-  const newScream = {
-    body: req.body.body,
-    userHandle: req.body.userHandle,
-    createdAt: new Date().toISOString()
-  };
-
-  db.collection('screams')
-    .add(newScream)
-    .then(() => {
-      res.json({ message: `document created successfully` });
-    })
-    .catch(err => {
-      res.status(500).json({ error: 'something went wrong' });
-      console.error(err);
-    });
-});
-
-const isEmpty = string => {
-  if (string.trim() === '') return true;
-  else return false;
-};
-
-const isEmail = email => {
-  const emailRegEx = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-  if (email.match(emailRegEx)) return true;
-  else return false;
-};
-
-app.post('/signup', (req, res) => {
-  const newUser = {
-    email: req.body.email,
-    password: req.body.password,
-    confirmPassword: req.body.confirmPassword,
-    handle: req.body.handle
-  };
-  let errors = {};
-
-  if (isEmpty(newUser.email)) {
-    errors.email = 'must not be empty';
-  } else if (!isEmail(newUser.email)) {
-    errors.email = 'must be a valid email address';
-  }
-  if (isEmpty(newUser.password)) {
-    errors.password = 'must not be empty';
-  } else if (newUser.password.length < 6) {
-    errors.password = 'password minimal 6 characther';
-  } else if (newUser.password !== newUser.confirmPassword) {
-    errors.confirmPassword = 'password not match';
-  }
-  if (isEmpty(newUser.handle)) {
-    errors.handle = 'must not be empty';
-  }
-  if (Object.keys(errors).length > 0) return res.status(400).json(errors);
-
-  let token, userIdSnap;
-  db.doc(`/users/${newUser.handle}`)
-    .get()
-    .then(doc => {
-      if (doc.exists) {
-        return res.status(400).json({ handle: 'this handle is already taken' });
-      } else {
-        return firebase
-          .auth()
-          .createUserWithEmailAndPassword(newUser.email, newUser.password);
-      }
-    })
-    .then(data => {
-      userIdSnap = data.user.uid;
-      return data.user.getIdToken();
-    })
-    .then(tokenSnap => {
-      token = tokenSnap;
-      const userCredentials = {
-        handle: newUser.handle,
-        email: newUser.email,
-        createdAt: new Date().toISOString(),
-        userId: userIdSnap
-      };
-      return db.doc(`/users/${newUser.handle}`).set(userCredentials);
-    })
-    .then(() => {
-      return res.status(201).json({ token });
-    })
-    .catch(err => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
-    });
-});
-
-app.post('/login', (req, res) => {
-  const user = {
-    email: req.body.email,
-    password: req.body.password
-  };
-
-  let errors = {};
-
-  if (isEmpty(user.email)) {
-    errors.email = 'must not be empty';
-  }
-  if (isEmpty(user.password)) {
-    errors.password = 'must not be empty';
-  }
-
-  if (Object.keys(errors).length > 0) {
-    return res.status(400).json(errors);
-  }
-
-  firebase
-    .auth()
-    .signInWithEmailAndPassword(user.email, user.password)
-    .then(data => {
-      return data.user.getIdToken();
-    })
-    .then(token => {
-      return res.json({ token });
-    })
-    .catch(err => {
-      console.error(err);
-      if (err.code === 'auth/wrong-password') {
-        return res.status(403).json({ general: 'Wrong username or Password' });
-      }
-      return res.status(500).json({ error: err.code });
-    });
-});
+app.post('/login', signIn);
 
 //https://baseurl.com/api
 exports.api = functions.https.onRequest(app);
