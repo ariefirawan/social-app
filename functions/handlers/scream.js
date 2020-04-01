@@ -61,7 +61,7 @@ exports.getScream = (req, res) => {
     .then(data => {
       dataScream.comments = [];
       data.forEach(doc => {
-        dataScream.push(doc.data());
+        dataScream.comments.push(doc.data());
       });
       return res.json(dataScream);
     })
