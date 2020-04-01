@@ -9,6 +9,8 @@ const app = express();
 
 app.get('/screams', posts.getAllScreams);
 app.post('/scream', auth, posts.addScream);
+app.get('/scream/:screamId', posts.getScream);
+app.post('/scream/:screamId/comment', auth, posts.commentOnScream);
 
 app.post('/signup', userHandler.signup);
 app.post('/login', userHandler.signIn);
