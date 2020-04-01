@@ -52,3 +52,22 @@ exports.validateSignInData = user => {
     valid: Object.keys(errors).length === 0 ? true : false
   };
 };
+
+exports.reduceUserDetails = data => {
+  let userDetails = {};
+
+  if (!isEmpty(data.bio.trim())) {
+    userDetails.bio = data.bio;
+  }
+  if (!isEmpty(data.website.trim())) {
+    //jika web tidak menggunakan ssl (https) maka default nya http
+    if (data.website.trim().substring(0, 4) !== 'http') {
+      userDetails.website = `http://${data.website}`;
+    } else userDetails.website = data.website;
+  }
+  if (!isEmpty(data.location.trim())) {
+    userDetails.location = data.location;
+  }
+
+  return userDetails;
+};

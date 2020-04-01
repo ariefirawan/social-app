@@ -13,6 +13,8 @@ app.post('/scream', auth, posts.addScream);
 app.post('/signup', userHandler.signup);
 app.post('/login', userHandler.signIn);
 app.post('/imageUpload', auth, userHandler.uploadImage);
+app.post('/user', auth, userHandler.addUserDetails);
+app.get('/user', auth, userHandler.getAuthenticatedUser);
 
 //https://baseurl.com/api
 exports.api = functions.https.onRequest(app);
